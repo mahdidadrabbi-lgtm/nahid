@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security Management Portal | RUAA Store</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <style>
+    body { font-family: 'Hind Siliguri', sans-serif; background-color: #F8FAFC; }
+    @media print {
+      body * { visibility: hidden; }
+      #printable-invoice, #printable-invoice * { visibility: visible; }
+      #printable-invoice { position: absolute; left: 0; top: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body class="text-slate-800">
+
+  <!-- SECURITY AUTH GATE MODAL (RBAC Route Guard) -->
+  <div id="auth-gate-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-5 border border-rose-100">
+      <div class="w-16 h-16 rounded-2xl bg-rose-100 text-[#FF4D6D] flex items-center justify-center mx-auto text-3xl shadow-xs">
+        <i class="fa-solid fa-shield-halved"></i>
+      </div>
+      <div>
+        <h3 class="text-xl font-extrabold text-slate-900">সিকিউরিটি এক্সেস ভেরিফিকেশন</h3>
+        <p class="text-slate-500 text-xs mt-1">অ্যাডমিন কন্ট্রোল প্যানেলে প্রবেশের জন্য সিক্রেট পাসকি প্রদান করুন</p>
+      </div>
+      
+      <form onsubmit="handleAuthSubmit(event)" class="space-y-4">
+        <input type="password" id="admin-passkey-input" required placeholder="অ্যাডমিন পাসওয়ার্ড লিখুন..." class="w-full p-4 rounded-xl bg-slate-50 border-2 border-slate-200 focus:border-[#FF4D6D] focus:bg-white outline-none font-mono text-center text-lg tracking-widest transition-all">
+        <button type="submit" class="w-full bg-[#FF4D6D] hover:bg-[#E03153] text-white py-3.5 rounded-xl font-bold text-sm shadow-md transition-all">
+          লগইন করুন
+        </button>
+        <p class="text-[11px] text-slate-400">দোকানের কনফিগার করা অ্যাডমিন পাসওয়ার্ড ব্যবহার করুন</p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main Admin Interface (Rendered after auth) -->
+  <div id="admin-app" class="hidden">
+    
+    <!-- Top Bar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <a href="/" class="text-2xl font-black font-serif tracking-tight text-slate-900">RUAA<span class="text-[#FF4D6D]">.</span></a>
+          <span class="bg-rose-50 text-[#FF4D6D] border border-rose-200 text-[11px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-[#FF4D6D] animate-ping"></span>
+            <span>Security Portal v2</span>
+          </span>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button onclick="refreshOrders()" class="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg text-sm flex items-center gap-1.5 font-bold transition-all">
+            <i class="fa-solid fa-arrows-rotate" id="refresh-icon"></i>
+            <span class="hidden sm:inline">রিফ্রেশ</span>
+          </button>
+          <button onclick="openSettingsModal()" class="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg text-sm flex items-center gap-1.5 font-bold transition-all">
+            <i class="fa-solid fa-gear"></i>
+            <span class="hidden sm:inline">সেটিংস</span>
+          </button>
+          <button onclick="logoutAdmin()" class="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg text-sm flex items-center gap-1.5 font-bold transition-all" title="লগআউট">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span class="hidden sm:inline">লগআউট</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      
+      <!-- Title & Export actions -->
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 class="text-2xl sm:text-3xl font-black text-slate-900">অর্ডার ও কুরিয়ার ম্যানেজমেন্ট</h1>
+          <p class="text-slate-500 text-xs sm:text-sm mt-0.5">রিয়েল-টাইম অর্ডার ট্র্যাকিং, এক ক্লিকে কুরিয়ার বুকিং ও ইনভয়েস প্রিন্ট</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="exportToCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all flex items-center gap-2">
+            <i class="fa-solid fa-file-excel"></i>
+            <span>কুরিয়ার CSV এক্সপোর্ট</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ANALYTICS SUMMARY WIDGETS -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        
+        <!-- Today's Revenue -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">আজকের রেভিনিউ</span>
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-bangladeshi-taka-sign"></i>
+            </div>
+          </div>
+          <div class="mt-3">
+            <span id="metric-today-revenue" class="text-3xl font-black text-slate-900">৳ 0</span>
+            <span class="text-xs text-emerald-600 font-bold ml-1">ক্যাশ অন ডেলিভারি</span>
+          </div>
+        </div>
+
+        <!-- Pending Orders Count -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">পেন্ডিং অর্ডার</span>
+            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-clock"></i>
+            </div>
+          </div>
+          <div class="mt-3">
+            <span id="metric-pending-orders" class="text-3xl font-black text-amber-500">0</span>
+            <span class="text-xs text-amber-600 font-bold ml-1">কল দিয়ে কনফার্ম করুন</span>
+          </div>
+        </div>
+
+        <!-- Delivered Orders Count -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">ডেলিভার্ড অর্ডার</span>
+            <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-box-open"></i>
+            </div>
+          </div>
+          <div class="mt-3">
+            <span id="metric-delivered-orders" class="text-3xl font-black text-blue-600">0</span>
+            <span class="text-xs text-blue-600 font-bold ml-1">সফল ডেলিভারি</span>
+          </div>
+        </div>
+
+        <!-- Low Stock Warning Widget -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">লো স্টক ওয়ার্নিং</span>
+            <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+          </div>
+          <div class="mt-3">
+            <span id="metric-low-stock" class="text-xl font-black text-rose-600">৩টি আইটেম</span>
+            <span class="text-[11px] text-slate-400 block mt-0.5">সাইজ ৫২ ও ৫৪ স্টক সীমিত</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Filters & Search Bar -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+        
+        <!-- Status Tabs -->
+        <div class="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0" id="filter-tabs">
+          <button onclick="setFilter('all')" class="filter-tab active px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-900 text-white transition-all">সবগুলো (<span id="count-all">0</span>)</button>
+          <button onclick="setFilter('Pending')" class="filter-tab px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">পেন্ডিং (<span id="count-pending">0</span>)</button>
+          <button onclick="setFilter('Confirmed')" class="filter-tab px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">কনফার্মড (<span id="count-confirmed">0</span>)</button>
+          <button onclick="setFilter('Shipped')" class="filter-tab px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">শিপিং (<span id="count-shipped">0</span>)</button>
+          <button onclick="setFilter('Delivered')" class="filter-tab px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">ডেলিভার্ড (<span id="count-delivered">0</span>)</button>
+          <button onclick="setFilter('Cancelled')" class="filter-tab px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">বাতিল (<span id="count-cancelled">0</span>)</button>
+        </div>
+
+        <!-- Search Input -->
+        <div class="relative w-full md:w-72">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input type="text" id="search-input" oninput="handleSearch(this.value)" placeholder="ফোন নম্বর, নাম বা আইডি খুঁজুন..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-[#FF4D6D] focus:bg-white transition-all">
+        </div>
+
+      </div>
+
+      <!-- Orders Table -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
+              <tr>
+                <th class="p-4">অর্ডার আইডি</th>
+                <th class="p-4">কাস্টমার তথ্য</th>
+                <th class="p-4">ঠিকানা ও এলাকা</th>
+                <th class="p-4">প্রোডাক্ট ও সাইজ</th>
+                <th class="p-4">মোট বিল</th>
+                <th class="p-4">স্ট্যাটাস</th>
+                <th class="p-4 text-right">কুরিয়ার / প্রিন্ট / মুছুন</th>
+              </tr>
+            </thead>
+            <tbody id="orders-tbody" class="divide-y divide-slate-100 text-slate-700">
+              <!-- Rendered via admin.js -->
+            </tbody>
+          </table>
+        </div>
+
+        <div id="no-orders-msg" class="hidden p-12 text-center text-slate-400">
+          <i class="fa-regular fa-folder-open text-4xl mb-3 block"></i>
+          <p class="text-sm font-semibold">কোনো অর্ডার পাওয়া যায়নি</p>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Printable Invoice Memo Container (Hidden on screen) -->
+  <div id="printable-invoice" class="hidden"></div>
+
+  <!-- Courier Dispatch Modal (Steadfast & Pathao) -->
+  <div id="courier-modal-container"></div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+    <div class="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-lg font-bold text-slate-900">দোকান ও বিজ্ঞাপন সেটিংস</h3>
+        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form onsubmit="saveSettings(event)" class="space-y-4 text-xs font-semibold max-h-[75vh] overflow-y-auto pr-1">
+        <div>
+          <label class="block text-slate-600 uppercase mb-1">WhatsApp হেল্পলাইন নম্বর</label>
+          <input type="text" id="setting-whatsapp" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-[#FF4D6D] font-mono text-sm" placeholder="88017XXXXXXXX">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-600 uppercase mb-1">ডেলিভারি চার্জ (ঢাকার ভিতরে)</label>
+            <input type="number" id="setting-fee-inside" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-[#FF4D6D] font-mono text-sm">
+          </div>
+          <div>
+            <label class="block text-slate-600 uppercase mb-1">ডেলিভারি চার্জ (ঢাকার বাইরে)</label>
+            <input type="number" id="setting-fee-outside" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-[#FF4D6D] font-mono text-sm">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-slate-600 uppercase mb-1">ফ্রি ডেলিভারি অফার (ন্যূনতম পিস)</label>
+          <input type="number" id="setting-free-qty" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-[#FF4D6D] font-mono text-sm" placeholder="2">
+          <span class="text-[10px] text-slate-400">কাস্টমার এই পরিমাণের সমান বা বেশি অর্ডার করলে ডেলিভারি চার্জ স্বয়ংক্রিয়ভাবে ০ ৳ হবে</span>
+        </div>
+
+        <div>
+          <label class="block text-slate-600 uppercase mb-1">টপ ব্যানার অফার টেক্সট</label>
+          <input type="text" id="setting-banner" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-[#FF4D6D] text-sm">
+        </div>
+
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">
+          কুরিয়ার বুকিং এখনো সংযুক্ত নয়। provider API integration ও credentials Vercel environment-এ configure না করা পর্যন্ত admin থেকে booking হবে না।
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex justify-end gap-2">
+          <button type="button" onclick="closeSettingsModal()" class="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold">বাতিল</button>
+          <button type="submit" class="px-6 py-2.5 rounded-xl bg-[#FF4D6D] hover:bg-[#E03153] text-white font-bold">সেভ করুন</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/admin.js"></script>
+</body>
+</html>

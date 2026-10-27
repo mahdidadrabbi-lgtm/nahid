@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>অর্ডার ট্র্যাকিং | RUAA Store</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <style>
+    body { font-family: 'Hind Siliguri', sans-serif; background-color: #FAFAFA; }
+  </style>
+</head>
+<body class="text-slate-800">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200">
+    <div class="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+      <a href="/" class="text-2xl font-black font-serif text-slate-900">RUAA<span class="text-[#FF4D6D]">.</span></a>
+      <a href="/" class="text-xs font-bold text-slate-600 hover:text-[#FF4D6D] flex items-center gap-1.5">
+        <i class="fa-solid fa-arrow-left"></i> দোকানে ফিরুন
+      </a>
+    </div>
+  </header>
+
+  <!-- Track Hero -->
+  <main class="max-w-2xl mx-auto px-4 py-12 space-y-8">
+    <div class="text-center space-y-2">
+      <div class="w-14 h-14 bg-rose-100 text-[#FF4D6D] rounded-2xl flex items-center justify-center mx-auto text-2xl shadow-xs">
+        <i class="fa-solid fa-truck-fast"></i>
+      </div>
+      <h1 class="text-3xl font-extrabold text-slate-900">আপনার পার্সেল ট্র্যাক করুন</h1>
+      <p class="text-slate-500 text-sm">অর্ডার করার সময় যে মোবাইল নম্বর দিয়েছিলেন অথবা অর্ডার আইডি দিয়ে সার্চ করুন</p>
+    </div>
+
+    <!-- Search Box -->
+    <div class="bg-white p-4 sm:p-6 rounded-3xl shadow-md border border-slate-200">
+      <form onsubmit="handleTrack(event)" class="flex flex-col sm:flex-row gap-3">
+        <div class="relative flex-1">
+          <i class="fa-solid fa-phone absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input type="text" id="track-query" required placeholder="মোবাইল নম্বর (০১XXXXXXXXX) অথবা অর্ডার আইডি" class="w-full pl-11 pr-4 py-3.5 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-semibold focus:outline-none focus:border-[#FF4D6D] focus:bg-white transition-all font-mono">
+        </div>
+        <button type="submit" id="track-btn" class="bg-[#FF4D6D] hover:bg-[#E03153] text-white px-6 py-3.5 rounded-2xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 shrink-0">
+          <span>ট্র্যাক করুন</span>
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </button>
+      </form>
+    </div>
+
+    <!-- Track Result -->
+    <div id="track-result" class="hidden space-y-6">
+      <!-- Injected by script -->
+    </div>
+
+    <!-- Need Help Card -->
+    <div class="bg-emerald-50 border border-emerald-200 p-5 rounded-2xl flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <i class="fa-brands fa-whatsapp text-3xl text-emerald-600"></i>
+        <div>
+          <h4 class="font-bold text-sm text-emerald-900">ডেলিভারি নিয়ে কোনো প্রশ্ন আছে?</h4>
+          <p class="text-xs text-emerald-700">সরাসরি আমাদের হোয়াটসঅ্যাপে মেসেজ দিয়ে জেনে নিন</p>
+        </div>
+      </div>
+      <a href="https://wa.me/8801988863486" target="_blank" rel="noopener noreferrer" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-xs transition-all shrink-0">
+        চ্যাট করুন
+      </a>
+    </div>
+
+  </main>
+
+  <script>
+    async function handleTrack(e) {
+      e.preventDefault();
+      const q = document.getElementById("track-query").value.trim();
+      if (!q) return;
+
+      const btn = document.getElementById("track-btn");
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> খোঁজা হচ্ছে...`;
+
+      const resultContainer = document.getElementById("track-result");
+
+      try {
+        const res = await fetch(`/api/track?query=${encodeURIComponent(q)}`);
+        const data = await res.json();
+
+        if (data.orders && data.orders.length > 0) {
+          resultContainer.innerHTML = data.orders.map(order => renderOrderCard(order)).join('');
+          resultContainer.classList.remove("hidden");
+        } else {
+          resultContainer.innerHTML = `
+            <div class="bg-white p-8 rounded-3xl border border-slate-200 text-center space-y-2">
+              <i class="fa-regular fa-circle-xmark text-4xl text-rose-500"></i>
+              <h3 class="text-lg font-bold text-slate-800">কোনো অর্ডার পাওয়া যায়নি</h3>
+              <p class="text-xs text-slate-500">নম্বরটি সঠিক কিনা দেখে আবার চেষ্টা করুন অথবা আমাদের সাথে যোগাযোগ করুন।</p>
+            </div>
+          `;
+          resultContainer.classList.remove("hidden");
+        }
+      } catch (err) {
+        alert("সার্ভারের সাথে যোগাযোগ করা যাচ্ছে না।");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>ট্র্যাক করুন</span> <i class="fa-solid fa-magnifying-glass"></i>`;
+      }
+    }
+
+    function renderOrderCard(order) {
+      const steps = [
+        { key: 'Pending', label: 'অর্ডার গৃহীত', icon: 'fa-clipboard-check' },
+        { key: 'Confirmed', label: 'কনফার্মড', icon: 'fa-phone-volume' },
+        { key: 'Shipped', label: 'কুরিয়ারে হস্তান্তর', icon: 'fa-truck-fast' },
+        { key: 'Delivered', label: 'ডেলিভারি সম্পন্ন', icon: 'fa-box-open' }
+      ];
+
+      const statusIndex = {
+        'Pending': 0,
+        'Confirmed': 1,
+        'Shipped': 2,
+        'Delivered': 3,
+        'Cancelled': -1
+      }[order.status] ?? 0;
+
+      const isCancelled = order.status === 'Cancelled';
+
+      return `
+        <div class="bg-white rounded-3xl p-6 shadow-md border border-slate-200 space-y-6">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+              <span class="text-xs text-slate-400">অর্ডার আইডি</span>
+              <h3 class="text-xl font-mono font-black text-slate-900">#${order.id}</h3>
+            </div>
+            <div class="text-right">
+              <span class="text-xs text-slate-400">মোট প্রদেয় বিল</span>
+              <div class="text-xl font-black text-[#FF4D6D]">৳ ${(order.total || 0).toLocaleString()}</div>
+            </div>
+          </div>
+
+          <!-- Progress Stepper -->
+          ${isCancelled ? `
+            <div class="bg-rose-50 text-rose-700 p-4 rounded-2xl text-center font-bold text-sm">
+              <i class="fa-solid fa-ban mr-1"></i> এই অর্ডারটি বাতিল (Cancelled) করা হয়েছে
+            </div>
+          ` : `
+            <div class="relative py-2">
+              <div class="grid grid-cols-4 gap-2 text-center">
+                ${steps.map((st, i) => {
+                  const isDone = i <= statusIndex;
+                  const isCurrent = i === statusIndex;
+                  return `
+                    <div class="flex flex-col items-center">
+                      <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm mb-2 font-bold transition-all ${
+                        isCurrent ? 'bg-[#FF4D6D] text-white shadow-lg scale-110' :
+                        isDone ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'
+                      }">
+                        <i class="fa-solid ${st.icon}"></i>
+                      </div>
+                      <span class="text-[11px] font-bold ${isCurrent ? 'text-[#FF4D6D]' : isDone ? 'text-slate-800' : 'text-slate-400'}">
+                        ${st.label}
+                      </span>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `}
+
+          <!-- Order Summary Details -->
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 text-xs space-y-1.5">
+            <p><strong>প্রোডাক্ট:</strong> ${order.productTitle}</p>
+            <p><strong>কালার ও সাইজ:</strong> ${order.color || '-'} / ${order.size || '-'}</p>
+            <p><strong>পেমেন্ট মাধ্যম:</strong> ক্যাশ অন ডেলিভারি (পার্সেল পেয়ে টাকা পরিশোধ)</p>
+          </div>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>

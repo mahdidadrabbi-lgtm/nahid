@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "outputDirectory": "public",
+  "rewrites": [
+    {
+      "source": "/track",
+      "destination": "/track.html"
+    },
+    {
+      "source": "/sys-portal-mgt-v2",
+      "destination": "/admin.html"
+    }
+  ]
+}

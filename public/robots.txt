@@ -1,0 +1,13 @@
+# RUAA Store - Robots Exclusion Protocol
+User-agent: *
+Disallow: /sys-portal-mgt-v2/
+Disallow: /sys-portal-mgt-v2
+Disallow: /api/
+Disallow: /data/
+
+# Allow indexing on public pages
+Allow: /
+Allow: /track
+Allow: /images/
+
+Sitemap: http://localhost:5000/sitemap.xml
