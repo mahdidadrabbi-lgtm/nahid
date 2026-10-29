@@ -47,25 +47,6 @@
     fbq('track', 'PageView');
   </script>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
-    import { getAnalytics, isSupported } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-analytics.js";
-
-    const firebaseApp = initializeApp({
-      apiKey: "AIzaSyB-Uvdglsvds2pNN1nF1nA741fLwWgog-NQ8",
-      authDomain: "nahid-66791.firebaseapp.com",
-      projectId: "nahid-66791",
-      storageBucket: "nahid-66791.firebasestorage.app",
-      messagingSenderId: "691282841658",
-      appId: "1:691282841658:web:8159f25952e457bc9be503",
-      measurementId: "G-QKQBNTJHH8"
-    });
-
-    isSupported().then(supported => {
-      if (supported) getAnalytics(firebaseApp);
-    }).catch(() => {});
-  </script>
-
   <style>
     body { font-family: 'Hind Siliguri', sans-serif; background-color: #FAFAFA; }
     .pulse-glow { animation: pulseGlow 2s infinite; }
@@ -82,8 +63,7 @@
   <!-- 1. Top Announcement Bar (Sticky) -->
   <div class="bg-gradient-to-r from-[#FF4D6D] via-[#E03153] to-[#FF4D6D] text-white py-2 px-4 text-center text-xs md:text-sm font-semibold tracking-wide flex items-center justify-center gap-2 shadow-sm sticky top-0 z-40">
     <span class="inline-block animate-bounce"><i class="fa-solid fa-gift"></i></span>
-    <span id="announcement-text">🔥 সীমিত সময়ের অফার! দুবাই প্রিমিয়াম চেরি জর্জেট বোরকা | অগ্রিম টাকা ছাড়াই ক্যাশ অন ডেলিভারি!</span>
-    <span class="hidden md:inline-block bg-white/20 text-white px-2.5 py-0.5 rounded-full text-xs font-bold ml-2">অফার রানিং</span>
+    <span id="announcement-text">দুবাই প্রিমিয়াম চেরি জর্জেট বোরকা | অগ্রিম টাকা ছাড়াই ক্যাশ অন ডেলিভারি!</span>
   </div>
 
   <!-- 2. Navbar -->
@@ -100,7 +80,6 @@
         <a href="#collections" class="hover:text-[#FF4D6D] transition-colors">কালেকশন সমূহ</a>
         <a href="#checkout-section" class="hover:text-[#FF4D6D] transition-colors font-bold text-[#FF4D6D]">১-পেজ চেকআউট</a>
         <a href="#features" class="hover:text-[#FF4D6D] transition-colors">কোয়ালিটি গ্যারান্টি</a>
-        <a href="#reviews" class="hover:text-[#FF4D6D] transition-colors">কাস্টমার রিভিউ</a>
         <a href="/track" class="hover:text-[#FF4D6D] transition-colors flex items-center gap-1.5 text-slate-800">
           <i class="fa-solid fa-truck-fast text-[#FF4D6D]"></i> পার্সেল ট্র্যাকিং
         </a>
@@ -389,76 +368,6 @@
     </div>
   </section>
 
-  <!-- 7. Verified Customer Reviews -->
-  <section id="reviews" class="bg-rose-50/60 py-16 border-t border-rose-100">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="text-center max-w-2xl mx-auto mb-12">
-        <span class="text-xs md:text-sm font-bold text-[#FF4D6D] uppercase tracking-widest">REAL REVIEWS</span>
-        <h2 class="text-3xl font-extrabold text-slate-900 mt-2">আমাদের সম্মানিত কাস্টমারদের মতামত</h2>
-        <div class="flex items-center justify-center gap-1 text-amber-400 mt-2 text-lg">
-          <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
-          <span class="text-slate-700 font-bold text-sm ml-2">৪.৯/৫ (১২০০+ সন্তুষ্ট কাস্টমার)</span>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
-          <div>
-            <div class="flex text-amber-400 mb-3 text-sm">
-              <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
-            </div>
-            <p class="text-slate-700 text-sm leading-relaxed mb-4">
-              "বোরকার ফেব্রিকটা জাস্ট অসাধারণ! দুবাই চেরি জর্জেট এতটাই নরম ও আরামদায়ক যে গরমের মধ্যেও খুব আরাম লাগে। ছবির চেয়ে বাস্তবে আরো বেশি সুন্দর।"
-            </p>
-          </div>
-          <div class="flex items-center gap-3 pt-4 border-t border-slate-100">
-            <div class="w-10 h-10 rounded-full bg-rose-100 text-[#FF4D6D] font-bold flex items-center justify-center">তা</div>
-            <div>
-              <h5 class="font-bold text-sm text-slate-900">তানজিলা আহমেদ</h5>
-              <span class="text-xs text-slate-400">উত্তরা, ঢাকা • Verified Buyer</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
-          <div>
-            <div class="flex text-amber-400 mb-3 text-sm">
-              <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
-            </div>
-            <p class="text-slate-700 text-sm leading-relaxed mb-4">
-              "আমি মা-মেয়ে ক্লাসিক কম্বো সেটটা নিয়েছিলাম। আমার আর আমার মেয়ের দুজনের সাইজ একদম পারফেক্ট হয়েছে। সেলাই ও কাপড় প্রিমিয়াম মানের। দ্রুত ডেলিভারির জন্য ধন্যবাদ।"
-            </p>
-          </div>
-          <div class="flex items-center gap-3 pt-4 border-t border-slate-100">
-            <div class="w-10 h-10 rounded-full bg-rose-100 text-[#FF4D6D] font-bold flex items-center justify-center">না</div>
-            <div>
-              <h5 class="font-bold text-sm text-slate-900">নাজমা বেগম</h5>
-              <span class="text-xs text-slate-400">খুলনা সদর • Verified Buyer</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
-          <div>
-            <div class="flex text-amber-400 mb-3 text-sm">
-              <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
-            </div>
-            <p class="text-slate-700 text-sm leading-relaxed mb-4">
-              "কোনো অগ্রিম টাকা দিতে হয়নি, পার্সেল খুলে দেখে চেক করে তারপর পেমেন্ট করেছি। এই বিশ্বাসযোগ্যতাটাই সবচেয়ে ভালো লেগেছে।"
-            </p>
-          </div>
-          <div class="flex items-center gap-3 pt-4 border-t border-slate-100">
-            <div class="w-10 h-10 rounded-full bg-rose-100 text-[#FF4D6D] font-bold flex items-center justify-center">ফা</div>
-            <div>
-              <h5 class="font-bold text-sm text-slate-900">ফারিয়া হক</h5>
-              <span class="text-xs text-slate-400">ধানমন্ডি, ঢাকা • Verified Buyer</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- 8. Footer (Admin Link completely hidden for security!) -->
   <footer class="bg-slate-900 text-white pt-12 pb-24 md:pb-12 border-t border-slate-800">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -466,7 +375,7 @@
         <div class="space-y-3">
           <span class="text-3xl font-extrabold font-serif">RUAA<span class="text-[#FF4D6D]">.</span></span>
           <p class="text-xs text-slate-400 leading-relaxed">
-            দুবাই প্রিমিয়াম চেরি জর্জেট বোরকা ও ইসলামিক ফ্যাশন নিয়ে কাজ করা বাংলাদেশের অন্যতম বিশ্বস্ত অনলাইন ব্র্যান্ড।
+            দুবাই প্রিমিয়াম চেরি জর্জেট বোরকা ও ইসলামিক ফ্যাশন কালেকশন।
           </p>
         </div>
 
@@ -641,27 +550,6 @@
         ঠিক আছে, বুঝতে পেরেছি
       </button>
     </div>
-  </div>
-
-  <!-- 13. LIVE SOCIAL PROOF SALES TOAST (Conversion Booster for Ads) -->
-  <div id="social-proof-toast" class="fixed bottom-20 left-4 z-40 hidden md:flex items-center gap-3 bg-white/95 backdrop-blur-md p-3.5 rounded-2xl shadow-2xl border border-rose-100 max-w-sm transition-all duration-500 transform translate-y-10 opacity-0">
-    <div class="w-11 h-11 rounded-xl bg-rose-100 text-[#FF4D6D] flex items-center justify-center text-xl shrink-0">
-      <i class="fa-solid fa-bag-shopping"></i>
-    </div>
-    <div class="text-xs">
-      <p class="font-bold text-slate-900 leading-tight">
-        <span id="toast-buyer-name">সাদিয়া ইসলাম</span>, <span id="toast-buyer-loc" class="text-slate-500">মিরপুর ঢাকা</span>
-      </p>
-      <p class="text-slate-600 text-[11px] mt-0.5">
-        এইমাত্র <strong id="toast-prod-title" class="text-[#FF4D6D]">মা স্পেশাল কালেকশন</strong> অর্ডার করেছেন!
-      </p>
-      <span class="text-[9px] text-emerald-600 font-bold block mt-0.5">
-        <i class="fa-solid fa-circle-check"></i> Verified Cash on Delivery
-      </span>
-    </div>
-    <button onclick="hideSocialProofToast()" class="text-slate-400 hover:text-slate-600 text-xs ml-1">
-      <i class="fa-solid fa-xmark"></i>
-    </button>
   </div>
 
   <!-- Scripts -->

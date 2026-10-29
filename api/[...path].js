@@ -21,7 +21,11 @@ function send(res, status, body) {
 
 function routeParts(req) {
   const path = req.query.path;
-  return Array.isArray(path) ? path : path ? [path] : [];
+  const parts = Array.isArray(path) ? path : path ? [path] : [];
+  if (parts.length) return parts;
+
+  const pathname = new URL(req.url || "/", "http://localhost").pathname;
+  return pathname.replace(/^\/api\/?/, "").split("/").filter(Boolean);
 }
 
 function requireAdmin(req, res) {
@@ -176,6 +180,9 @@ module.exports = async function handler(req, res) {
     return send(res, 405, { error: "Method not allowed" });
   } catch (error) {
     console.error("Vercel API error:", error);
+    if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+      return send(res, 503, { error: "Order service is not configured yet. Please contact the store." });
+    }
     return send(res, 500, { error: "Internal server error" });
   }
 };

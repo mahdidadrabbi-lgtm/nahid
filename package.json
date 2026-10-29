@@ -3,7 +3,8 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "dev": "npx vercel dev"
+    "test": "node --test",
+    "vercel:dev": "vercel dev --listen 5000"
   },
   "engines": {
     "node": ">=20"
@@ -11,5 +12,8 @@
   "dependencies": {
     "firebase-admin": "^13.4.0",
     "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "vercel": "^65.5.0"
   }
 }

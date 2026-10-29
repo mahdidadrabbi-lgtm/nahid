@@ -20,7 +20,7 @@ Bangladesh modest-fashion storefront with product color variants, one-page check
 
 1. In Firebase Console, create a Firestore database in production mode.
 2. In Project settings, create a service account key. Keep its JSON private; never commit it or put it in browser code.
-3. Confirm the Firebase Web app configuration in Project settings. The API key currently provided for Analytics returns `400 API key not valid` in the browser, so replace it with the valid Web app config before relying on Analytics.
+3. Firebase Analytics is currently disabled because the old web API key is invalid. If you want Analytics, copy the current Firebase Web app config from Project settings before enabling it.
 4. Optionally publish the deny-by-default Firestore rules with `npx firebase-tools deploy --only firestore:rules` after selecting the Firebase project with `npx firebase-tools use --add`.
 
 ## GitHub setup
@@ -55,9 +55,10 @@ The Firebase Web config and Meta Pixel ID are public browser identifiers, not se
 
 ```powershell
 npm install
+npm test
 npx vercel link
 npx vercel env pull .env.local
-npm run dev
+npm run vercel:dev
 ```
 
 Set the three required Environment Variables in the linked Vercel project before pulling them. `.env.local`, local JSON data, and Vercel build output are excluded from Git.
@@ -67,4 +68,5 @@ Set the three required Environment Variables in the linked Vercel project before
 - The existing local `server.ps1` and JSON files are for local use only; production requests use the Vercel API and Firestore.
 - Existing local orders are not automatically migrated to Firestore.
 - Pathao and Steadfast live booking need separate provider-specific API integration and credentials. The current Vercel functions return an explicit not-configured response.
-- Firebase Analytics will not initialize successfully until the supplied Firebase Web API key is corrected in the Firebase config in `public/index.html`.
+- Meta Pixel events are configured in the storefront, but verify the Pixel ID and incoming events in Meta Events Manager before starting paid campaigns.
+- Real customer reviews and stock counts should only be displayed once supplied and kept up to date.

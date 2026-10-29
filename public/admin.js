@@ -52,9 +52,13 @@ async function handleAuthSubmit(e) {
       body: JSON.stringify({ password: entered })
     });
     const result = await response.json();
-    if (!response.ok || !result.token) {
+    if (response.status === 401) {
       alert("ভুল পাসওয়ার্ড। আবার চেষ্টা করুন।");
       input.select();
+      return;
+    }
+    if (!response.ok || !result.token) {
+      alert(result.error || "অ্যাডমিন লগইন এখন কনফিগার করা নেই।");
       return;
     }
 
@@ -270,12 +274,11 @@ async function updateOrderStatus(orderId, newStatus) {
       },
       body: JSON.stringify({ status: newStatus })
     });
-    if (res.ok) {
-      const order = allOrders.find(o => o.id === orderId);
-      if (order) order.status = newStatus;
-      updateAnalyticsWidgets();
-      renderOrders();
-    }
+    if (!res.ok) throw new Error(`Status update failed (${res.status})`);
+    const order = allOrders.find(o => o.id === orderId);
+    if (order) order.status = newStatus;
+    updateAnalyticsWidgets();
+    renderOrders();
   } catch (err) {
     console.error("Status update error:", err);
     alert("স্ট্যাটাস আপডেট করা সম্ভব হয়নি।");
@@ -289,13 +292,13 @@ async function deleteOrder(orderId) {
       method: "DELETE",
       headers: adminAuthHeaders()
     });
-    if (res.ok) {
-      allOrders = allOrders.filter(o => o.id !== orderId);
-      updateAnalyticsWidgets();
-      renderOrders();
-    }
+    if (!res.ok) throw new Error(`Order deletion failed (${res.status})`);
+    allOrders = allOrders.filter(o => o.id !== orderId);
+    updateAnalyticsWidgets();
+    renderOrders();
   } catch (err) {
     console.error("Delete error:", err);
+    alert("অর্ডারটি মুছতে সমস্যা হয়েছে।");
   }
 }
 

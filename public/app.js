@@ -9,7 +9,6 @@ const PRODUCTS = [
     price: 1190,
     oldPrice: 1690,
     discount: "30% OFF",
-    stockLeft: 4,
     badge: "বেস্ট সেলার",
     image: "/images/ma/ma_navy.jpg",
     colors: [
@@ -28,7 +27,6 @@ const PRODUCTS = [
     price: 1680,
     oldPrice: 2200,
     discount: "24% OFF",
-    stockLeft: 6,
     badge: "কম্বো অফার",
     image: "/images/classic/classic_black.jpg",
     colors: [
@@ -47,7 +45,6 @@ const PRODUCTS = [
     price: 990,
     oldPrice: 1290,
     discount: "23% OFF",
-    stockLeft: 5,
     badge: "জনপ্রিয়",
     image: "/images/boro-bon/boro_bon_black_new.jpg",
     colors: [
@@ -66,7 +63,6 @@ const PRODUCTS = [
     price: 890,
     oldPrice: 1190,
     discount: "25% OFF",
-    stockLeft: 3,
     badge: "লিমিটেড স্টক",
     image: "/images/ma-boro-meye/ma_boro_meye_blue_latest.jpg",
     colors: [
@@ -85,7 +81,6 @@ const PRODUCTS = [
     price: 690,
     oldPrice: 890,
     discount: "22% OFF",
-    stockLeft: 8,
     badge: "কিডস স্পেশাল",
     image: "/images/kids/kids_black.jpg",
     colors: [
@@ -103,7 +98,6 @@ const PRODUCTS = [
     price: 590,
     oldPrice: 850,
     discount: "30% OFF",
-    stockLeft: 7,
     badge: "হট ডিল",
     image: "/images/choto-bon/chotobon_black.jpg",
     colors: [
@@ -122,7 +116,6 @@ const PRODUCTS = [
     price: 450,
     oldPrice: 650,
     discount: "30% OFF",
-    stockLeft: 12,
     badge: "প্রিমিয়াম হিজাব",
     image: "/images/ma/ma_olive.jpg",
     colors: [
@@ -153,8 +146,6 @@ let freeDeliveryMinQty = 2;
 document.addEventListener("DOMContentLoaded", () => {
   renderProducts("all");
   initEmbeddedCheckout();
-  startCountdown();
-  initSocialProofToasts();
   fetchSettings();
 });
 
@@ -174,9 +165,6 @@ function renderProducts(cat = "all") {
           <span class="bg-[#FF4D6D] text-white text-[11px] font-extrabold px-3 py-1 rounded-full shadow-md uppercase">
             ${prod.discount}
           </span>
-          <span class="bg-slate-900/80 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-            🔥 মাত্র ${prod.stockLeft}টি বাকি
-          </span>
         </div>
 
         <!-- Zoom button pill -->
@@ -193,10 +181,7 @@ function renderProducts(cat = "all") {
       <!-- Info Area -->
       <div class="p-5 sm:p-6 space-y-4 flex-1 flex flex-col justify-between">
         <div class="space-y-2">
-          <div class="flex items-center justify-between text-xs text-slate-400">
-            <span class="text-amber-500 font-bold flex items-center gap-1">
-              <i class="fa-solid fa-star"></i> 5.0 (verified)
-            </span>
+          <div class="text-xs text-slate-400">
             <span>দুবাই চেরি ফেব্রিক</span>
           </div>
 
@@ -481,48 +466,6 @@ function closeSizeChartModal() {
 }
 
 // LIVE SOCIAL PROOF SALES TOAST (Conversion Booster)
-const RECENT_BUYERS = [
-  { name: "সাদিয়া ইসলাম", loc: "ধানমন্ডি, ঢাকা", prod: "মা স্পেশাল কালেকশন" },
-  { name: "নুসরাত জাহান", loc: "হালিশহর, চট্টগ্রাম", prod: "মা-মেয়ে ক্লাসিক কম্বো" },
-  { name: "সুমাইয়া সুলতানা", loc: "উপশহর, সিলেট", prod: "বড় বোন কালেকশন" },
-  { name: "মারিয়া চৌধুরী", loc: "উত্তরা, ঢাকা", prod: "মা ও বড় মেয়ে কালেকশন" },
-  { name: "আফরোজা খানম", loc: "সদর, খুলনা", prod: "দুবাই চেরি হিজাব" }
-];
-let toastIndex = 0;
-
-function initSocialProofToasts() {
-  const toast = document.getElementById('social-proof-toast');
-  if (!toast) return;
-
-  setInterval(() => {
-    const buyer = RECENT_BUYERS[toastIndex % RECENT_BUYERS.length];
-    toastIndex++;
-
-    document.getElementById('toast-buyer-name').innerText = buyer.name;
-    document.getElementById('toast-buyer-loc').innerText = buyer.loc;
-    document.getElementById('toast-prod-title').innerText = buyer.prod;
-
-    toast.classList.remove('hidden');
-    setTimeout(() => {
-      toast.classList.remove('translate-y-10', 'opacity-0');
-      toast.classList.add('translate-y-0', 'opacity-100');
-    }, 50);
-
-    setTimeout(() => {
-      hideSocialProofToast();
-    }, 6000);
-  }, 20000);
-}
-
-function hideSocialProofToast() {
-  const toast = document.getElementById('social-proof-toast');
-  if (toast) {
-    toast.classList.remove('translate-y-0', 'opacity-100');
-    toast.classList.add('translate-y-10', 'opacity-0');
-    setTimeout(() => toast.classList.add('hidden'), 500);
-  }
-}
-
 // Handle Embedded Order Submit
 async function handleEmbeddedOrderSubmit(e) {
   e.preventDefault();
@@ -574,6 +517,11 @@ async function handleEmbeddedOrderSubmit(e) {
     });
     const data = await res.json();
 
+    if (!res.ok) {
+      alert(data.error || 'অর্ডার সম্পন্ন করা যায়নি। অনুগ্রহ করে আবার চেষ্টা করুন।');
+      return;
+    }
+
     if (data.success && data.order) {
       const order = data.order;
 
@@ -615,7 +563,7 @@ async function handleEmbeddedOrderSubmit(e) {
       document.getElementById('emb-quantity').innerText = '1';
       recalculateEmbBill();
     } else {
-      alert('অর্ডার সম্পন্ন করা যায়নি। অনুগ্রহ করে আবার চেষ্টা করুন।');
+      alert(data.error || 'অর্ডার সম্পন্ন করা যায়নি। অনুগ্রহ করে আবার চেষ্টা করুন।');
     }
   } catch (err) {
     console.error('Order error:', err);
@@ -629,33 +577,6 @@ async function handleEmbeddedOrderSubmit(e) {
 function closeSuccessModal() {
   document.getElementById('success-modal').classList.add('hidden');
   document.body.classList.remove('overflow-hidden');
-}
-
-// Countdown Timer
-function startCountdown() {
-  let seconds = 19;
-  let minutes = 42;
-  let hours = 8;
-
-  setInterval(() => {
-    if (seconds > 0) {
-      seconds--;
-    } else {
-      seconds = 59;
-      if (minutes > 0) {
-        minutes--;
-      } else {
-        minutes = 59;
-        if (hours > 0) hours--;
-      }
-    }
-    const secEl = document.getElementById('seconds');
-    const minEl = document.getElementById('minutes');
-    const hrEl = document.getElementById('hours');
-    if (secEl) secEl.innerText = String(seconds).padStart(2, '0');
-    if (minEl) minEl.innerText = String(minutes).padStart(2, '0');
-    if (hrEl) hrEl.innerText = String(hours).padStart(2, '0');
-  }, 1000);
 }
 
 // Settings fetch
