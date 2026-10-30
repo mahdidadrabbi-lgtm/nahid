@@ -256,6 +256,54 @@ test("production order creation accepts a valid Turnstile response", async () =>
   }
 });
 
+test("production order creation reports safe Siteverify error codes without saving", async () => {
+  const previousEnvironment = process.env.VERCEL_ENV;
+  const previousSiteKey = process.env.TURNSTILE_SITE_KEY;
+  const previousSecretKey = process.env.TURNSTILE_SECRET_KEY;
+  const previousFetch = global.fetch;
+  const previousConsoleError = console.error;
+  let loggedError = "";
+  process.env.VERCEL_ENV = "production";
+  process.env.TURNSTILE_SITE_KEY = "test-site-key";
+  process.env.TURNSTILE_SECRET_KEY = "test-secret-key";
+  global.fetch = async () => ({
+    ok: false,
+    status: 400,
+    json: async () => ({ "error-codes": ["invalid-input-secret", "unsafe code"] })
+  });
+  console.error = (...args) => {
+    loggedError = args.map(String).join(" ");
+  };
+
+  try {
+    orders.clear();
+    const order = await request("POST", "/api/orders", {
+      name: "Rejected Buyer",
+      phone: "01712345678",
+      address: "Test address",
+      city: "inside_dhaka",
+      productId: "ma",
+      color: "Navy Blue",
+      size: "54",
+      quantity: 1,
+      turnstileToken: "invalid-test-token"
+    });
+
+    assert.equal(order.statusCode, 503);
+    assert.match(loggedError, /Turnstile verification failed \(400; invalid-input-secret\)/);
+    assert.equal(orders.size, 0);
+  } finally {
+    global.fetch = previousFetch;
+    console.error = previousConsoleError;
+    if (previousEnvironment === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = previousEnvironment;
+    if (previousSiteKey === undefined) delete process.env.TURNSTILE_SITE_KEY;
+    else process.env.TURNSTILE_SITE_KEY = previousSiteKey;
+    if (previousSecretKey === undefined) delete process.env.TURNSTILE_SECRET_KEY;
+    else process.env.TURNSTILE_SECRET_KEY = previousSecretKey;
+  }
+});
+
 test("production order creation rejects invalid Turnstile action or hostname", async () => {
   const previousEnvironment = process.env.VERCEL_ENV;
   const previousSiteKey = process.env.TURNSTILE_SITE_KEY;

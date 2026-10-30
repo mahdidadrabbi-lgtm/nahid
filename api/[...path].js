@@ -37,8 +37,13 @@ async function verifyTurnstile(token, remoteIp) {
     body,
     signal: AbortSignal.timeout(5000)
   });
-  if (!response.ok) throw new Error(`Turnstile verification failed (${response.status})`);
   const result = await response.json();
+  if (!response.ok) {
+    const errorCodes = Array.isArray(result["error-codes"])
+      ? result["error-codes"].filter(code => typeof code === "string" && /^[a-z-]+$/.test(code)).join(",")
+      : "no-error-code";
+    throw new Error(`Turnstile verification failed (${response.status}; ${errorCodes})`);
+  }
   return result.success === true
     && result.action === TURNSTILE_ACTION
     && result.hostname === TURNSTILE_HOSTNAME;
