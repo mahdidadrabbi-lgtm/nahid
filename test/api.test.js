@@ -221,10 +221,18 @@ test("production order creation accepts a valid Turnstile response", async () =>
   global.fetch = async (url, options) => {
     assert.equal(url, "https://challenges.cloudflare.com/turnstile/v0/siteverify");
     assert.equal(new URLSearchParams(options.body).get("response"), "valid-test-token");
-    return { ok: true, json: async () => ({ success: true }) };
+    return {
+      ok: true,
+      json: async () => ({
+        success: true,
+        action: "order",
+        hostname: "ruaaborqa.vercel.app"
+      })
+    };
   };
 
   try {
+    orders.clear();
     const order = await request("POST", "/api/orders", {
       name: "Verified Buyer",
       phone: "01712345678",
@@ -237,6 +245,91 @@ test("production order creation accepts a valid Turnstile response", async () =>
       turnstileToken: "valid-test-token"
     });
     assert.equal(order.statusCode, 201);
+  } finally {
+    global.fetch = previousFetch;
+    if (previousEnvironment === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = previousEnvironment;
+    if (previousSiteKey === undefined) delete process.env.TURNSTILE_SITE_KEY;
+    else process.env.TURNSTILE_SITE_KEY = previousSiteKey;
+    if (previousSecretKey === undefined) delete process.env.TURNSTILE_SECRET_KEY;
+    else process.env.TURNSTILE_SECRET_KEY = previousSecretKey;
+  }
+});
+
+test("production order creation rejects invalid Turnstile action or hostname", async () => {
+  const previousEnvironment = process.env.VERCEL_ENV;
+  const previousSiteKey = process.env.TURNSTILE_SITE_KEY;
+  const previousSecretKey = process.env.TURNSTILE_SECRET_KEY;
+  const previousFetch = global.fetch;
+  process.env.VERCEL_ENV = "production";
+  process.env.TURNSTILE_SITE_KEY = "test-site-key";
+  process.env.TURNSTILE_SECRET_KEY = "test-secret-key";
+  const invalidResponses = [
+    { success: true, action: "login", hostname: "ruaaborqa.vercel.app" },
+    { success: true, action: "order", hostname: "attacker.example" },
+    { success: true, hostname: "ruaaborqa.vercel.app" },
+    { success: false, action: "order", hostname: "ruaaborqa.vercel.app" }
+  ];
+  global.fetch = async () => ({
+    ok: true,
+    json: async () => invalidResponses.shift()
+  });
+
+  try {
+    orders.clear();
+    for (let index = 0; index < 4; index += 1) {
+      const order = await request("POST", "/api/orders", {
+        name: "Rejected Buyer",
+        phone: `0171234567${index}`,
+        address: "Test address",
+        city: "inside_dhaka",
+        productId: "ma",
+        color: "Navy Blue",
+        size: "54",
+        quantity: 1,
+        turnstileToken: `invalid-test-token-${index}`
+      });
+      assert.equal(order.statusCode, 400);
+    }
+    assert.equal(orders.size, 0);
+  } finally {
+    global.fetch = previousFetch;
+    if (previousEnvironment === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = previousEnvironment;
+    if (previousSiteKey === undefined) delete process.env.TURNSTILE_SITE_KEY;
+    else process.env.TURNSTILE_SITE_KEY = previousSiteKey;
+    if (previousSecretKey === undefined) delete process.env.TURNSTILE_SECRET_KEY;
+    else process.env.TURNSTILE_SECRET_KEY = previousSecretKey;
+  }
+});
+
+test("production order creation rejects oversized Turnstile tokens before verification", async () => {
+  const previousEnvironment = process.env.VERCEL_ENV;
+  const previousSiteKey = process.env.TURNSTILE_SITE_KEY;
+  const previousSecretKey = process.env.TURNSTILE_SECRET_KEY;
+  const previousFetch = global.fetch;
+  process.env.VERCEL_ENV = "production";
+  process.env.TURNSTILE_SITE_KEY = "test-site-key";
+  process.env.TURNSTILE_SECRET_KEY = "test-secret-key";
+  global.fetch = async () => {
+    throw new Error("Siteverify must not be called for oversized tokens");
+  };
+
+  try {
+    orders.clear();
+    const order = await request("POST", "/api/orders", {
+      name: "Rejected Buyer",
+      phone: "01712345678",
+      address: "Test address",
+      city: "inside_dhaka",
+      productId: "ma",
+      color: "Navy Blue",
+      size: "54",
+      quantity: 1,
+      turnstileToken: "x".repeat(2049)
+    });
+    assert.equal(order.statusCode, 400);
+    assert.equal(orders.size, 0);
   } finally {
     global.fetch = previousFetch;
     if (previousEnvironment === undefined) delete process.env.VERCEL_ENV;

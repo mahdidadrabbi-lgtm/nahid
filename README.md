@@ -8,7 +8,7 @@ Bangladesh modest-fashion storefront with product color variants, one-page check
 - Firebase Firestore stores orders and store settings. The browser never accesses Firestore directly.
 - Admin sign-in uses `ADMIN_PASSWORD`; API sessions are signed with `JWT_SECRET`.
 - New order updates are checked by the admin dashboard every 10 seconds; browser notifications and sound require the admin to enable them while the dashboard is open.
-- Production checkout requires Cloudflare Turnstile. Configure `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` in Vercel before deploying; the secret must never be exposed in browser code or committed.
+- Production checkout requires Cloudflare Turnstile. Configure the production widget's `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` in Vercel before deploying; the secret must never be exposed in browser code or committed. Order tokens are accepted only when Siteverify confirms the `order` action and exact hostname `ruaaborqa.vercel.app`.
 - Courier booking is disabled until a real provider integration and server-side credentials are configured. The API returns `503` rather than pretending a parcel was booked.
 
 ## Requirements

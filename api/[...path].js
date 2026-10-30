@@ -15,6 +15,8 @@ const PRODUCTS = {
 const ORDER_STATUSES = new Set(["Pending", "Confirmed", "Processing", "Shipped", "Delivered", "Cancelled"]);
 const PUBLIC_SETTINGS_KEYS = ["whatsapp", "pixelId", "deliveryFeeInside", "deliveryFeeOutside", "currency", "freeDeliveryMinQty", "bannerOfferText"];
 const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+const TURNSTILE_ACTION = "order";
+const TURNSTILE_HOSTNAME = "ruaaborqa.vercel.app";
 
 function isTurnstileRequired() {
   return process.env.VERCEL_ENV === "production"
@@ -24,7 +26,7 @@ function isTurnstileRequired() {
 
 async function verifyTurnstile(token, remoteIp) {
   const secret = process.env.TURNSTILE_SECRET_KEY;
-  if (!secret || !token) return false;
+  if (!secret || typeof token !== "string" || token.length === 0 || token.length > 2048) return false;
 
   const body = new URLSearchParams({ secret, response: token });
   if (remoteIp) body.set("remoteip", remoteIp);
@@ -37,7 +39,9 @@ async function verifyTurnstile(token, remoteIp) {
   });
   if (!response.ok) throw new Error(`Turnstile verification failed (${response.status})`);
   const result = await response.json();
-  return result.success === true;
+  return result.success === true
+    && result.action === TURNSTILE_ACTION
+    && result.hostname === TURNSTILE_HOSTNAME;
 }
 
 function send(res, status, body) {

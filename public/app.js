@@ -175,6 +175,7 @@ async function initTurnstile() {
     await loadTurnstileScript();
     turnstileWidgetId = window.turnstile.render('#turnstile-widget', {
       sitekey: config.siteKey,
+      action: 'order',
       callback: () => message.classList.add('hidden'),
       'expired-callback': () => window.turnstile.reset(turnstileWidgetId),
       'error-callback': () => {
