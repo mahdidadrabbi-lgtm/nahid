@@ -141,13 +141,83 @@ let embDeliveryFeeOutside = 130;
 let embDeliveryZone = "inside_dhaka";
 let whatsappNumber = "8801988863486";
 let freeDeliveryMinQty = 2;
+let turnstileConfigLoaded = false;
+let turnstileRequired = false;
+let turnstileWidgetId = null;
+let turnstileSetupPromise;
 
 // Initialize
 document.addEventListener("DOMContentLoaded", () => {
   renderProducts("all");
   initEmbeddedCheckout();
   fetchSettings();
+  turnstileSetupPromise = initTurnstile();
 });
+
+async function initTurnstile() {
+  const container = document.getElementById('turnstile-container');
+  const message = document.getElementById('turnstile-message');
+
+  try {
+    const response = await fetch('/api/captcha-config');
+    if (!response.ok) throw new Error('Security settings could not be loaded');
+    const config = await response.json();
+    turnstileRequired = config.required === true;
+    turnstileConfigLoaded = true;
+    if (!turnstileRequired) return;
+
+    container.classList.remove('hidden');
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.alignItems = 'center';
+    if (!config.siteKey) throw new Error('অর্ডার ফর্মের নিরাপত্তা যাচাই এখনো কনফিগার করা হয়নি।');
+
+    await loadTurnstileScript();
+    turnstileWidgetId = window.turnstile.render('#turnstile-widget', {
+      sitekey: config.siteKey,
+      callback: () => message.classList.add('hidden'),
+      'expired-callback': () => window.turnstile.reset(turnstileWidgetId),
+      'error-callback': () => {
+        message.textContent = 'নিরাপত্তা যাচাই লোড হয়নি। পেজ রিফ্রেশ করে আবার চেষ্টা করুন।';
+        message.classList.remove('hidden');
+      }
+    });
+  } catch (error) {
+    turnstileConfigLoaded = false;
+    if (container) {
+      container.classList.remove('hidden');
+      container.style.display = 'flex';
+      container.style.justifyContent = 'center';
+    }
+    if (message) {
+      message.textContent = error.message || 'নিরাপত্তা যাচাই লোড হয়নি।';
+      message.classList.remove('hidden');
+    }
+    console.error('Turnstile setup error:', error);
+  }
+}
+
+function loadTurnstileScript() {
+  if (window.turnstile) return Promise.resolve();
+  const existingScript = document.querySelector('script[data-turnstile]');
+  if (existingScript) {
+    return new Promise((resolve, reject) => {
+      existingScript.addEventListener('load', resolve, { once: true });
+      existingScript.addEventListener('error', () => reject(new Error('Security check could not be loaded')), { once: true });
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    script.async = true;
+    script.defer = true;
+    script.dataset.turnstile = 'true';
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('Security check could not be loaded'));
+    document.head.appendChild(script);
+  });
+}
 
 // Render Product Grid with zoom support
 function renderProducts(cat = "all") {
@@ -469,6 +539,12 @@ function closeSizeChartModal() {
 // Handle Embedded Order Submit
 async function handleEmbeddedOrderSubmit(e) {
   e.preventDefault();
+  await turnstileSetupPromise;
+
+  if (!turnstileConfigLoaded) {
+    alert('নিরাপত্তা যাচাই লোড হয়নি। পেজ রিফ্রেশ করে আবার চেষ্টা করুন।');
+    return;
+  }
 
   const name = document.getElementById('emb-cust-name').value.trim();
   const phone = document.getElementById('emb-cust-phone').value.trim();
@@ -480,6 +556,14 @@ async function handleEmbeddedOrderSubmit(e) {
   if (!phoneRegex.test(phone)) {
     alert('দয়া করে সঠিক ১১ ডিজিটের মোবাইল নম্বর প্রদান করুন (যেমন: 017XXXXXXXX)');
     document.getElementById('emb-cust-phone').focus();
+    return;
+  }
+
+  const captchaToken = turnstileRequired && turnstileWidgetId !== null
+    ? window.turnstile.getResponse(turnstileWidgetId)
+    : '';
+  if (turnstileRequired && !captchaToken) {
+    alert('অর্ডার দেওয়ার আগে নিরাপত্তা যাচাই সম্পন্ন করুন।');
     return;
   }
 
@@ -506,7 +590,8 @@ async function handleEmbeddedOrderSubmit(e) {
     total: total,
     status: "Pending",
     paymentMethod: "Cash on Delivery",
-    note: note
+    note,
+    turnstileToken: captchaToken
   };
 
   try {
@@ -569,6 +654,9 @@ async function handleEmbeddedOrderSubmit(e) {
     console.error('Order error:', err);
     alert('সার্ভারের সাথে সংযোগ স্থাপন করা যায়নি।');
   } finally {
+    if (turnstileRequired && turnstileWidgetId !== null) {
+      window.turnstile.reset(turnstileWidgetId);
+    }
     btn.disabled = false;
     btn.innerHTML = `<span>ক্যাশ অন ডেলিভারিতে অর্ডার সম্পন্ন করুন</span> <i class="fa-solid fa-arrow-right"></i>`;
   }

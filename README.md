@@ -7,6 +7,8 @@ Bangladesh modest-fashion storefront with product color variants, one-page check
 - Vercel serves the files in `public/` and runs the Node.js functions in `api/`.
 - Firebase Firestore stores orders and store settings. The browser never accesses Firestore directly.
 - Admin sign-in uses `ADMIN_PASSWORD`; API sessions are signed with `JWT_SECRET`.
+- New order updates are checked by the admin dashboard every 10 seconds; browser notifications and sound require the admin to enable them while the dashboard is open.
+- Production checkout requires Cloudflare Turnstile. Configure `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` in Vercel before deploying; the secret must never be exposed in browser code or committed.
 - Courier booking is disabled until a real provider integration and server-side credentials are configured. The API returns `503` rather than pretending a parcel was booked.
 
 ## Requirements
@@ -46,7 +48,9 @@ If `git remote add` says `origin` already exists, inspect it with `git remote -v
    - `ADMIN_PASSWORD`: a unique password with at least 12 characters.
    - `JWT_SECRET`: a random value with at least 32 characters.
    - `FIREBASE_SERVICE_ACCOUNT`: the complete Firebase service-account JSON.
-4. Deploy. Vercel serves the storefront at `/`, tracking at `/track`, and the protected dashboard at `/sys-portal-mgt-v2`.
+   - `TURNSTILE_SITE_KEY`: public site key from your Cloudflare Turnstile widget, configured for your production domain.
+   - `TURNSTILE_SECRET_KEY`: private secret from the same widget. Keep it only in Vercel Environment Variables.
+4. Deploy. Vercel serves the storefront at `/`, tracking at `/track`, and the protected dashboard at `/sys-portal-mgt-v2`. Production order creation is rejected until both Turnstile keys are configured.
 5. Test one checkout, verify it appears in the dashboard, update its status, and track it by order ID. Delete any test order afterward.
 
 The Firebase Web config and Meta Pixel ID are public browser identifiers, not server credentials. The Firebase Admin service-account JSON, `ADMIN_PASSWORD`, and `JWT_SECRET` must remain Vercel Environment Variables and must not be committed.
@@ -67,6 +71,9 @@ Set the three required Environment Variables in the linked Vercel project before
 
 - The existing local `server.ps1` and JSON files are for local use only; production requests use the Vercel API and Firestore.
 - Existing local orders are not automatically migrated to Firestore.
+- The dashboard refreshes order changes every 10 seconds while open, and flags repeat orders with the same phone number within two minutes. Browser notifications and sound are opt-in and only work while the admin dashboard is open.
+- Daily/monthly dashboard totals are order counts and COD order value (excluding cancelled orders), not confirmed cash received.
 - Pathao and Steadfast live booking need separate provider-specific API integration and credentials. The current Vercel functions return an explicit not-configured response.
-- Meta Pixel events are configured in the storefront, but verify the Pixel ID and incoming events in Meta Events Manager before starting paid campaigns.
+- Meta Pixel browser events are configured in the storefront; Conversions API (CAPI) is not configured. Verify the Pixel ID and incoming events in Meta Events Manager before starting paid campaigns.
+- The sitemap uses the current Vercel production alias. Replace its URLs in `public/robots.txt` and `public/sitemap.xml` if the production domain changes.
 - Real customer reviews and stock counts should only be displayed once supplied and kept up to date.

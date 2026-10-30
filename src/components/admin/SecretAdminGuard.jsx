@@ -1,23 +1,30 @@
 /**
  * SecretAdminGuard Component
- * Role-Based Access Control (RBAC) & Route Guard for /sys-portal-mgt-v2
+ * Admin authentication is verified by the server.
  */
 
-export const ADMIN_SECRET_KEY = 'ruaa-admin-secret-2026';
-
 export function checkAdminAuth() {
-  const token = sessionStorage.getItem('admin_token');
-  return token === ADMIN_SECRET_KEY;
+  return Boolean(sessionStorage.getItem('admin_token'));
 }
 
-export function promptAdminLogin(onSuccess) {
-  const key = prompt('🔐 নিরাপত্তা পিন বা সিক্রেট এক্সেস কি প্রদান করুন:');
-  if (key === ADMIN_SECRET_KEY) {
-    sessionStorage.setItem('admin_token', key);
+export async function promptAdminLogin(onSuccess) {
+  const password = prompt('🔐 অ্যাডমিন পাসওয়ার্ড লিখুন:');
+  if (!password) return false;
+
+  try {
+    const response = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    const result = await response.json();
+    if (!response.ok || !result.token) throw new Error(result.error || 'Admin login failed');
+
+    sessionStorage.setItem('admin_token', result.token);
     if (onSuccess) onSuccess();
     return true;
-  } else {
-    alert('❌ অনুমতিহীন এক্সেস! আপনি রিডাইরেক্ট হচ্ছেন...');
+  } catch (error) {
+    alert(error.message || 'অ্যাডমিন লগইন করা যায়নি।');
     window.location.href = '/';
     return false;
   }

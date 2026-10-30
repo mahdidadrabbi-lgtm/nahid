@@ -10,4 +10,4 @@ Allow: /
 Allow: /track
 Allow: /images/
 
-Sitemap: http://localhost:5000/sitemap.xml
+Sitemap: https://nahid-umber.vercel.app/sitemap.xml

@@ -78,10 +78,14 @@
       <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 class="text-2xl sm:text-3xl font-black text-slate-900">অর্ডার ও কুরিয়ার ম্যানেজমেন্ট</h1>
-          <p class="text-slate-500 text-xs sm:text-sm mt-0.5">রিয়েল-টাইম অর্ডার ট্র্যাকিং, এক ক্লিকে কুরিয়ার বুকিং ও ইনভয়েস প্রিন্ট</p>
+          <p class="text-slate-500 text-xs sm:text-sm mt-0.5">নতুন অর্ডার সাধারণত ৫ সেকেন্ডের মধ্যে ড্যাশবোর্ডে দেখা যায়</p>
         </div>
 
         <div class="flex items-center gap-2">
+          <button id="order-notifications-button" onclick="enableOrderNotifications()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all flex items-center gap-2">
+            <i class="fa-regular fa-bell"></i>
+            <span>নোটিফিকেশন চালু</span>
+          </button>
           <button onclick="exportToCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all flex items-center gap-2">
             <i class="fa-solid fa-file-excel"></i>
             <span>কুরিয়ার CSV এক্সপোর্ট</span>
@@ -92,17 +96,18 @@
       <!-- ANALYTICS SUMMARY WIDGETS -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         
-        <!-- Today's Revenue -->
+        <!-- Daily Order Summary -->
         <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">আজকের রেভিনিউ</span>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">আজকের অর্ডার</span>
             <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">
               <i class="fa-solid fa-bangladeshi-taka-sign"></i>
             </div>
           </div>
           <div class="mt-3">
-            <span id="metric-today-revenue" class="text-3xl font-black text-slate-900">৳ 0</span>
-            <span class="text-xs text-emerald-600 font-bold ml-1">ক্যাশ অন ডেলিভারি</span>
+            <span id="metric-today-orders" class="text-3xl font-black text-slate-900">0</span>
+            <span class="text-xs text-slate-500 font-bold ml-1">টি অর্ডার</span>
+            <span id="metric-today-revenue" class="block text-xs text-emerald-600 font-bold mt-1">অর্ডার ভ্যালু: ৳ 0</span>
           </div>
         </div>
 
@@ -134,17 +139,18 @@
           </div>
         </div>
 
-        <!-- Low Stock Warning Widget -->
+        <!-- Monthly Order Summary -->
         <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">লো স্টক ওয়ার্নিং</span>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">এই মাসের অর্ডার</span>
             <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center text-lg">
-              <i class="fa-solid fa-triangle-exclamation"></i>
+              <i class="fa-solid fa-chart-line"></i>
             </div>
           </div>
           <div class="mt-3">
-            <span id="metric-low-stock" class="text-xl font-black text-rose-600">৩টি আইটেম</span>
-            <span class="text-[11px] text-slate-400 block mt-0.5">সাইজ ৫২ ও ৫৪ স্টক সীমিত</span>
+            <span id="metric-month-orders" class="text-3xl font-black text-slate-900">0</span>
+            <span class="text-xs text-slate-500 font-bold ml-1">টি অর্ডার</span>
+            <span id="metric-month-revenue" class="block text-xs text-rose-600 font-bold mt-1">অর্ডার ভ্যালু: ৳ 0</span>
           </div>
         </div>
 
@@ -158,9 +164,11 @@
           <button onclick="setFilter('all')" class="filter-tab active px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-900 text-white transition-all">সবগুলো (<span id="count-all">0</span>)</button>
           <button onclick="setFilter('Pending')" class="filter-tab px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">পেন্ডিং (<span id="count-pending">0</span>)</button>
           <button onclick="setFilter('Confirmed')" class="filter-tab px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">কনফার্মড (<span id="count-confirmed">0</span>)</button>
+          <button onclick="setFilter('Processing')" class="filter-tab px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">প্রসেসিং (<span id="count-processing">0</span>)</button>
           <button onclick="setFilter('Shipped')" class="filter-tab px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">শিপিং (<span id="count-shipped">0</span>)</button>
           <button onclick="setFilter('Delivered')" class="filter-tab px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">ডেলিভার্ড (<span id="count-delivered">0</span>)</button>
           <button onclick="setFilter('Cancelled')" class="filter-tab px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">বাতিল (<span id="count-cancelled">0</span>)</button>
+          <button onclick="setFilter('duplicate')" class="filter-tab px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">ডুপ্লিকেট (<span id="count-duplicate">0</span>)</button>
         </div>
 
         <!-- Search Input -->

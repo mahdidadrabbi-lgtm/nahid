@@ -53,13 +53,15 @@ const db = {
         return { docs: [...orders.values()].map(data => ({ data: () => data })) };
       },
       where(field, operator, value) {
-        assert.equal(field, "phone");
-        assert.equal(operator, "==");
         return {
           async get() {
             return {
               docs: [...orders.values()]
-                .filter(order => order.phone === value)
+                .filter(order => {
+                  if (field === "phone") return order.phone === value;
+                  if (field === "updatedAt" && operator === ">=") return order.updatedAt >= value;
+                  return false;
+                })
                 .map(data => ({ data: () => data }))
             };
           }
@@ -142,16 +144,106 @@ test("checkout orders can be authenticated, managed, and tracked", async () => {
   assert.equal(dashboardOrders.body[0].id, orderId);
 
   const updated = await request("PUT", `/api/orders/${orderId}`, {
-    status: "Confirmed"
+    status: "Processing"
   }, login.body.token);
   assert.equal(updated.statusCode, 200);
 
   const tracked = await request("GET", `/api/track?query=${orderId}`);
   assert.equal(tracked.statusCode, 200);
-  assert.equal(tracked.body.orders[0].status, "Confirmed");
+  assert.equal(tracked.body.orders[0].status, "Processing");
+
+  const updates = await request("GET", `/api/orders?since=${encodeURIComponent(new Date(Date.now() - 60_000).toISOString())}`, undefined, login.body.token);
+  assert.equal(updates.statusCode, 200);
+  assert.equal(updates.body[0].updatedAt, orders.get(orderId).updatedAt);
 
   const deleted = await request("DELETE", `/api/orders/${orderId}`, undefined, login.body.token);
   assert.equal(deleted.statusCode, 200);
   const noLongerTracked = await request("GET", `/api/track?query=${orderId}`);
   assert.deepEqual(noLongerTracked.body.orders, []);
+});
+
+test("repeat orders from the same phone within two minutes are flagged", async () => {
+  orders.clear();
+  const orderDetails = {
+    name: "Repeat Buyer",
+    phone: "01712345678",
+    address: "Test address",
+    city: "inside_dhaka",
+    productId: "ma",
+    color: "Navy Blue",
+    size: "54",
+    quantity: 1
+  };
+
+  const first = await request("POST", "/api/orders", orderDetails);
+  const second = await request("POST", "/api/orders", orderDetails);
+
+  assert.equal(first.statusCode, 201);
+  assert.equal(first.body.order.isDuplicate, false);
+  assert.equal(second.statusCode, 201);
+  assert.equal(second.body.order.isDuplicate, true);
+  assert.equal(second.body.order.duplicateOf, first.body.order.id);
+});
+
+test("Turnstile is required for production order writes when its credentials are absent", async () => {
+  const previousEnvironment = process.env.VERCEL_ENV;
+  process.env.VERCEL_ENV = "production";
+
+  try {
+    const config = await request("GET", "/api/captcha-config");
+    assert.deepEqual(config.body, { required: true, siteKey: "" });
+
+    const order = await request("POST", "/api/orders", {
+      name: "Captcha Buyer",
+      phone: "01712345678",
+      address: "Test address",
+      city: "inside_dhaka",
+      productId: "ma",
+      color: "Navy Blue",
+      size: "54",
+      quantity: 1
+    });
+    assert.equal(order.statusCode, 503);
+  } finally {
+    if (previousEnvironment === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = previousEnvironment;
+  }
+});
+
+test("production order creation accepts a valid Turnstile response", async () => {
+  const previousEnvironment = process.env.VERCEL_ENV;
+  const previousSiteKey = process.env.TURNSTILE_SITE_KEY;
+  const previousSecretKey = process.env.TURNSTILE_SECRET_KEY;
+  const previousFetch = global.fetch;
+  process.env.VERCEL_ENV = "production";
+  process.env.TURNSTILE_SITE_KEY = "test-site-key";
+  process.env.TURNSTILE_SECRET_KEY = "test-secret-key";
+  global.fetch = async (url, options) => {
+    assert.equal(url, "https://challenges.cloudflare.com/turnstile/v0/siteverify");
+    assert.equal(new URLSearchParams(options.body).get("response"), "valid-test-token");
+    return { ok: true, json: async () => ({ success: true }) };
+  };
+
+  try {
+    const order = await request("POST", "/api/orders", {
+      name: "Verified Buyer",
+      phone: "01712345678",
+      address: "Test address",
+      city: "inside_dhaka",
+      productId: "ma",
+      color: "Navy Blue",
+      size: "54",
+      quantity: 1,
+      turnstileToken: "valid-test-token"
+    });
+    assert.equal(order.statusCode, 201);
+  } finally {
+    global.fetch = previousFetch;
+    if (previousEnvironment === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = previousEnvironment;
+    if (previousSiteKey === undefined) delete process.env.TURNSTILE_SITE_KEY;
+    else process.env.TURNSTILE_SITE_KEY = previousSiteKey;
+    if (previousSecretKey === undefined) delete process.env.TURNSTILE_SECRET_KEY;
+    else process.env.TURNSTILE_SECRET_KEY = previousSecretKey;
+  }
 });

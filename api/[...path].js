@@ -12,8 +12,33 @@ const PRODUCTS = {
   hijab: { title: "দুবাই প্রিমিয়াম চেরি হিজাব (বড় সাইজ)", price: 450, colors: ["Olive", "Black", "Maroon", "Navy Blue"], sizes: ["৪০ ইঞ্চি", "৭২ ইঞ্চি", "৮০ ইঞ্চি"] }
 };
 
-const ORDER_STATUSES = new Set(["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled"]);
+const ORDER_STATUSES = new Set(["Pending", "Confirmed", "Processing", "Shipped", "Delivered", "Cancelled"]);
 const PUBLIC_SETTINGS_KEYS = ["whatsapp", "pixelId", "deliveryFeeInside", "deliveryFeeOutside", "currency", "freeDeliveryMinQty", "bannerOfferText"];
+const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+
+function isTurnstileRequired() {
+  return process.env.VERCEL_ENV === "production"
+    || process.env.TURNSTILE_REQUIRED === "true"
+    || Boolean(process.env.TURNSTILE_SITE_KEY || process.env.TURNSTILE_SECRET_KEY);
+}
+
+async function verifyTurnstile(token, remoteIp) {
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+  if (!secret || !token) return false;
+
+  const body = new URLSearchParams({ secret, response: token });
+  if (remoteIp) body.set("remoteip", remoteIp);
+
+  const response = await fetch(TURNSTILE_VERIFY_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+    signal: AbortSignal.timeout(5000)
+  });
+  if (!response.ok) throw new Error(`Turnstile verification failed (${response.status})`);
+  const result = await response.json();
+  return result.success === true;
+}
 
 function send(res, status, body) {
   return res.status(status).json(body);
@@ -47,6 +72,13 @@ function publicOrder(order) {
 
 module.exports = async function handler(req, res) {
   const [resource, id] = routeParts(req);
+
+  if (resource === "captcha-config" && req.method === "GET") {
+    return send(res, 200, {
+      required: isTurnstileRequired(),
+      siteKey: process.env.TURNSTILE_SITE_KEY || ""
+    });
+  }
 
   if (resource === "login" && req.method === "POST") {
     try {
@@ -88,7 +120,14 @@ module.exports = async function handler(req, res) {
 
     if (resource === "orders" && !id) {
       if (req.method === "GET") {
-        const snapshot = await db.collection("orders").get();
+        const since = req.query.since;
+        if (since && !Number.isFinite(Date.parse(since))) {
+          return send(res, 400, { error: "Invalid update cursor" });
+        }
+        const ordersRef = db.collection("orders");
+        const snapshot = since
+          ? await ordersRef.where("updatedAt", ">=", new Date(since).toISOString()).get()
+          : await ordersRef.get();
         const orders = snapshot.docs.map(doc => doc.data()).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
         return send(res, 200, orders);
       }
@@ -106,8 +145,34 @@ module.exports = async function handler(req, res) {
           return send(res, 400, { success: false, error: "Invalid product variant" });
         }
 
+        if (isTurnstileRequired()) {
+          if (!process.env.TURNSTILE_SITE_KEY || !process.env.TURNSTILE_SECRET_KEY) {
+            return send(res, 503, { success: false, error: "Order protection is not configured. Please contact the store." });
+          }
+          try {
+            const forwardedFor = req.headers["x-forwarded-for"];
+            const remoteIp = typeof forwardedFor === "string" ? forwardedFor.split(",")[0].trim() : "";
+            if (!await verifyTurnstile(body.turnstileToken, remoteIp)) {
+              return send(res, 400, { success: false, error: "Please complete the security check and try again." });
+            }
+          } catch (error) {
+            console.error("Turnstile verification error:", error);
+            return send(res, 503, { success: false, error: "Security check is temporarily unavailable. Please try again." });
+          }
+        }
+
         const settings = await getSettings(db);
         const deliveryFee = quantity >= Number(settings.freeDeliveryMinQty) ? 0 : city === "inside_dhaka" ? Number(settings.deliveryFeeInside) : Number(settings.deliveryFeeOutside);
+        const now = new Date();
+        const recentOrders = await db.collection("orders").where("phone", "==", phone).get();
+        const duplicateOrder = recentOrders.docs
+          .map(doc => doc.data())
+          .filter(order => {
+            const createdAt = Date.parse(order.createdAt);
+            const age = now.getTime() - createdAt;
+            return Number.isFinite(createdAt) && age >= 0 && age <= 2 * 60 * 1000;
+          })
+          .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
         const id = `RUAA-${randomInt(100000, 1000000)}`;
         const order = {
           id,
@@ -124,9 +189,12 @@ module.exports = async function handler(req, res) {
           deliveryFee,
           total: product.price * quantity + deliveryFee,
           status: "Pending",
+          isDuplicate: Boolean(duplicateOrder),
+          duplicateOf: duplicateOrder?.id || null,
           paymentMethod: "Cash on Delivery",
           note: String(body.note || "").trim(),
-          createdAt: new Date().toISOString()
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString()
         };
         await db.collection("orders").doc(id).create(order);
         return send(res, 201, { success: true, order });
@@ -148,6 +216,7 @@ module.exports = async function handler(req, res) {
         }
         if (req.body?.note !== undefined) update.note = String(req.body.note).slice(0, 1000);
         if (!Object.keys(update).length) return send(res, 400, { error: "No valid fields to update" });
+        update.updatedAt = new Date().toISOString();
         await orderRef.update(update);
         return send(res, 200, { success: true });
       }

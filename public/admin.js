@@ -4,6 +4,34 @@ let allOrders = [];
 let currentFilter = 'all';
 let searchQuery = '';
 let orderRefreshTimer = null;
+let ordersSyncCursor = null;
+let orderNotificationsEnabled = false;
+let notificationAudioContext = null;
+let ordersFetchInProgress = false;
+const dhakaDateFormatter = new Intl.DateTimeFormat("en", {
+  timeZone: "Asia/Dhaka",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit"
+});
+
+function getDhakaDateKey(date) {
+  const parts = dhakaDateFormatter.formatToParts(date).reduce((values, part) => {
+    values[part.type] = part.value;
+    return values;
+  }, {});
+  return { day: `${parts.year}-${parts.month}-${parts.day}`, month: `${parts.year}-${parts.month}` };
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[char]);
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   verifyAdminAuthentication();
@@ -23,7 +51,7 @@ async function verifyAdminAuthentication() {
 function showAdminApp() {
   document.getElementById("auth-gate-modal").classList.add("hidden");
   document.getElementById("admin-app").classList.remove("hidden");
-  if (!orderRefreshTimer) orderRefreshTimer = setInterval(fetchOrders, 12000);
+  if (!orderRefreshTimer) orderRefreshTimer = setInterval(fetchOrders, 5000);
 }
 
 function showAdminLogin() {
@@ -81,11 +109,15 @@ function logoutAdmin() {
 }
 
 async function fetchOrders() {
+  if (ordersFetchInProgress) return false;
+  ordersFetchInProgress = true;
   const icon = document.getElementById("refresh-icon");
   if (icon) icon.classList.add("fa-spin");
 
   try {
-    const res = await fetch("/api/orders", {
+    const isInitialSync = ordersSyncCursor === null;
+    const cursor = isInitialSync ? "" : `?since=${encodeURIComponent(new Date(ordersSyncCursor - 2000).toISOString())}`;
+    const res = await fetch(`/api/orders${cursor}`, {
       headers: adminAuthHeaders()
     });
     if (res.status === 401) {
@@ -93,9 +125,27 @@ async function fetchOrders() {
       return false;
     }
     if (!res.ok) throw new Error("Failed to load");
-    const orders = await res.json();
-    if (!Array.isArray(orders)) throw new Error("Invalid order data");
-    allOrders = orders;
+    const changedOrders = await res.json();
+    if (!Array.isArray(changedOrders)) throw new Error("Invalid order data");
+
+    if (isInitialSync) {
+      allOrders = changedOrders;
+    } else {
+      const newOrders = [];
+      for (const changedOrder of changedOrders) {
+        const index = allOrders.findIndex(order => order.id === changedOrder.id);
+        if (index === -1) {
+          allOrders.unshift(changedOrder);
+          newOrders.push(changedOrder);
+        } else {
+          allOrders[index] = changedOrder;
+        }
+      }
+      if (newOrders.length) notifyNewOrders(newOrders);
+      allOrders.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    }
+
+    ordersSyncCursor = Date.now();
     updateAnalyticsWidgets();
     renderOrders();
     return true;
@@ -104,26 +154,85 @@ async function fetchOrders() {
     return false;
   } finally {
     if (icon) icon.classList.remove("fa-spin");
+    ordersFetchInProgress = false;
+  }
+}
+
+async function enableOrderNotifications() {
+  const button = document.getElementById("order-notifications-button");
+  try {
+    if ("Notification" in window && Notification.permission === "default") {
+      await Notification.requestPermission();
+    }
+
+    orderNotificationsEnabled = true;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) {
+      notificationAudioContext = new AudioContextClass();
+      await notificationAudioContext.resume();
+      playOrderNotificationSound();
+    }
+
+    if (button) {
+      button.innerHTML = '<i class="fa-solid fa-bell"></i><span>নোটিফিকেশন চালু আছে</span>';
+      button.classList.remove("bg-blue-600", "hover:bg-blue-700");
+      button.classList.add("bg-emerald-600", "hover:bg-emerald-700");
+    }
+  } catch (error) {
+    console.error("Could not enable order notifications:", error);
+    alert("ব্রাউজারে নোটিফিকেশন চালু করা যায়নি। ব্রাউজার permission settings পরীক্ষা করুন।");
+  }
+}
+
+function playOrderNotificationSound() {
+  if (!notificationAudioContext) return;
+  const now = notificationAudioContext.currentTime;
+  [0, 0.18].forEach(offset => {
+    const oscillator = notificationAudioContext.createOscillator();
+    const gain = notificationAudioContext.createGain();
+    oscillator.frequency.value = 880;
+    gain.gain.setValueAtTime(0.0001, now + offset);
+    gain.gain.exponentialRampToValueAtTime(0.18, now + offset + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.14);
+    oscillator.connect(gain);
+    gain.connect(notificationAudioContext.destination);
+    oscillator.start(now + offset);
+    oscillator.stop(now + offset + 0.15);
+  });
+}
+
+function notifyNewOrders(orders) {
+  if (!orderNotificationsEnabled) return;
+  playOrderNotificationSound();
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+  for (const order of orders) {
+    new Notification("RUAA Store — নতুন অর্ডার", {
+      body: `${order.id} · ${order.productTitle} · ৳ ${Number(order.total || 0).toLocaleString()}`
+    });
   }
 }
 
 function updateAnalyticsWidgets() {
-  const todayStr = new Date().toISOString().slice(0, 10);
-  
-  // Today's revenue calculation
-  const todayOrders = allOrders.filter(o => o.createdAt && o.createdAt.startsWith(todayStr));
-  const todayRevenue = todayOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
-  
-  // If today's orders are 0 in demo data, calculate recent total sales
-  const displayRevenue = todayRevenue > 0 ? todayRevenue : allOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+  const { day: todayKey, month: monthKey } = getDhakaDateKey(new Date());
+  const isNotCancelled = order => order.status !== "Cancelled";
+  const todayOrders = allOrders.filter(order => order.createdAt && getDhakaDateKey(new Date(order.createdAt)).day === todayKey);
+  const monthOrders = allOrders.filter(order => order.createdAt && getDhakaDateKey(new Date(order.createdAt)).month === monthKey);
+  const todayOrderValue = todayOrders.filter(isNotCancelled).reduce((sum, order) => sum + (Number(order.total) || 0), 0);
+  const monthOrderValue = monthOrders.filter(isNotCancelled).reduce((sum, order) => sum + (Number(order.total) || 0), 0);
 
   const pendingCount = allOrders.filter(o => o.status === 'Pending').length;
   const deliveredCount = allOrders.filter(o => o.status === 'Delivered').length;
   const shippedCount = allOrders.filter(o => o.status === 'Shipped').length;
   const confirmedCount = allOrders.filter(o => o.status === 'Confirmed').length;
+  const processingCount = allOrders.filter(o => o.status === 'Processing').length;
   const cancelledCount = allOrders.filter(o => o.status === 'Cancelled').length;
+  const duplicateCount = allOrders.filter(o => o.isDuplicate).length;
 
-  document.getElementById("metric-today-revenue").innerText = `৳ ${displayRevenue.toLocaleString()}`;
+  document.getElementById("metric-today-orders").innerText = todayOrders.length;
+  document.getElementById("metric-today-revenue").innerText = `অর্ডার ভ্যালু: ৳ ${todayOrderValue.toLocaleString()}`;
+  document.getElementById("metric-month-orders").innerText = monthOrders.length;
+  document.getElementById("metric-month-revenue").innerText = `অর্ডার ভ্যালু: ৳ ${monthOrderValue.toLocaleString()}`;
   document.getElementById("metric-pending-orders").innerText = pendingCount;
   document.getElementById("metric-delivered-orders").innerText = deliveredCount;
 
@@ -131,9 +240,11 @@ function updateAnalyticsWidgets() {
   document.getElementById("count-all").innerText = allOrders.length;
   document.getElementById("count-pending").innerText = pendingCount;
   document.getElementById("count-confirmed").innerText = confirmedCount;
+  document.getElementById("count-processing").innerText = processingCount;
   document.getElementById("count-shipped").innerText = shippedCount;
   document.getElementById("count-delivered").innerText = deliveredCount;
   document.getElementById("count-cancelled").innerText = cancelledCount;
+  document.getElementById("count-duplicate").innerText = duplicateCount;
 }
 
 function renderOrders() {
@@ -143,7 +254,9 @@ function renderOrders() {
 
   let filtered = allOrders;
 
-  if (currentFilter !== 'all') {
+  if (currentFilter === 'duplicate') {
+    filtered = filtered.filter(order => order.isDuplicate);
+  } else if (currentFilter !== 'all') {
     filtered = filtered.filter(o => o.status === currentFilter);
   }
 
@@ -168,10 +281,17 @@ function renderOrders() {
   tbody.innerHTML = filtered.map(order => {
     const dateFormatted = order.createdAt ? new Date(order.createdAt).toLocaleString('bn-BD', { dateStyle: 'short', timeStyle: 'short' }) : 'আজ';
     const waText = encodeURIComponent(`আসসালামু আলাইকুম ${order.name}, RUAA Store থেকে আপনার #${order.id} অর্ডারটি কনফার্ম করার জন্য মেসেজ দেওয়া হয়েছে।`);
+    const name = escapeHtml(order.name);
+    const phone = escapeHtml(order.phone);
+    const address = escapeHtml(order.address);
+    const productTitle = escapeHtml(order.productTitle);
+    const color = escapeHtml(order.color || 'Default');
+    const size = escapeHtml(order.size || 'Free');
 
     const statusBg = {
       'Pending': 'bg-amber-50 text-amber-700 border-amber-200',
       'Confirmed': 'bg-blue-50 text-blue-700 border-blue-200',
+      'Processing': 'bg-cyan-50 text-cyan-700 border-cyan-200',
       'Shipped': 'bg-purple-50 text-purple-700 border-purple-200',
       'Delivered': 'bg-emerald-50 text-emerald-700 border-emerald-200',
       'Cancelled': 'bg-rose-50 text-rose-700 border-rose-200'
@@ -180,15 +300,15 @@ function renderOrders() {
     return `
       <tr class="hover:bg-slate-50/80 transition-colors">
         <td class="p-4 font-mono font-bold text-slate-900">
-          <div>#${order.id}</div>
+          <div>#${escapeHtml(order.id)} ${order.isDuplicate ? '<span class="ml-1 rounded bg-rose-100 px-1.5 py-0.5 text-[9px] text-rose-700">ডুপ্লিকেট</span>' : ''}</div>
           <div class="text-[10px] text-slate-400 font-sans mt-0.5">${dateFormatted}</div>
         </td>
 
         <td class="p-4">
-          <div class="font-bold text-slate-900 text-sm">${order.name}</div>
+          <div class="font-bold text-slate-900 text-sm">${name}</div>
           <div class="font-mono text-xs text-slate-600 mt-0.5 flex items-center gap-2">
-            <span>${order.phone}</span>
-            <a href="tel:${order.phone}" class="text-blue-500 hover:text-blue-700" title="কল দিন">
+            <span>${phone}</span>
+            <a href="tel:${phone}" class="text-blue-500 hover:text-blue-700" title="কল দিন">
               <i class="fa-solid fa-phone"></i>
             </a>
             <a href="https://wa.me/88${order.phone.replace(/^0/, '')}?text=${waText}" target="_blank" class="text-emerald-500 hover:text-emerald-700" title="WhatsApp চ্যাট">
@@ -198,17 +318,17 @@ function renderOrders() {
         </td>
 
         <td class="p-4 max-w-xs">
-          <div class="line-clamp-2 text-slate-600 text-xs">${order.address}</div>
+          <div class="line-clamp-2 text-slate-600 text-xs">${address}</div>
           <span class="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded ${order.city === 'inside_dhaka' ? 'bg-sky-50 text-sky-700' : 'bg-purple-50 text-purple-700'}">
             ${order.city === 'inside_dhaka' ? 'ঢাকার ভিতরে' : 'ঢাকার বাইরে'}
           </span>
         </td>
 
         <td class="p-4">
-          <div class="font-bold text-slate-800">${order.productTitle}</div>
+          <div class="font-bold text-slate-800">${productTitle}</div>
           <div class="text-[11px] text-slate-500 mt-0.5">
-            কালার: <span class="font-semibold text-slate-700">${order.color || 'Default'}</span> | 
-            সাইজ: <span class="font-semibold text-slate-700">${order.size || 'Free'}</span>
+            কালার: <span class="font-semibold text-slate-700">${color}</span> |
+            সাইজ: <span class="font-semibold text-slate-700">${size}</span>
             ${order.quantity > 1 ? ` | <span class="text-rose-500 font-bold">${order.quantity}টি</span>` : ''}
           </div>
         </td>
@@ -222,6 +342,7 @@ function renderOrders() {
           <select onchange="updateOrderStatus('${order.id}', this.value)" class="text-xs font-bold rounded-lg px-2.5 py-1.5 border focus:outline-none transition-all cursor-pointer ${statusBg}">
             <option value="Pending" ${order.status === 'Pending' ? 'selected' : ''}>⏳ পেন্ডিং (Pending)</option>
             <option value="Confirmed" ${order.status === 'Confirmed' ? 'selected' : ''}>✅ কনফার্মড (Confirmed)</option>
+            <option value="Processing" ${order.status === 'Processing' ? 'selected' : ''}>📦 প্রসেসিং (Processing)</option>
             <option value="Shipped" ${order.status === 'Shipped' ? 'selected' : ''}>🚚 শিপিং (Shipped)</option>
             <option value="Delivered" ${order.status === 'Delivered' ? 'selected' : ''}>🎉 ডেলিভার্ড (Delivered)</option>
             <option value="Cancelled" ${order.status === 'Cancelled' ? 'selected' : ''}>❌ বাতিল (Cancelled)</option>
@@ -276,7 +397,10 @@ async function updateOrderStatus(orderId, newStatus) {
     });
     if (!res.ok) throw new Error(`Status update failed (${res.status})`);
     const order = allOrders.find(o => o.id === orderId);
-    if (order) order.status = newStatus;
+    if (order) {
+      order.status = newStatus;
+      order.updatedAt = new Date().toISOString();
+    }
     updateAnalyticsWidgets();
     renderOrders();
   } catch (err) {
@@ -307,6 +431,12 @@ function printOrderInvoice(orderId) {
   const order = allOrders.find(o => o.id === orderId);
   if (!order) return;
 
+  const name = escapeHtml(order.name);
+  const phone = escapeHtml(order.phone);
+  const address = escapeHtml(order.address);
+  const productTitle = escapeHtml(order.productTitle);
+  const color = escapeHtml(order.color || '-');
+  const size = escapeHtml(order.size || '-');
   const invoiceDiv = document.getElementById("printable-invoice");
   invoiceDiv.innerHTML = `
     <div style="font-family: 'Hind Siliguri', sans-serif, system-ui; max-width: 600px; margin: auto; padding: 25px; border: 2px solid #e2e8f0; border-radius: 12px; background: #fff; color: #1e293b;">
@@ -325,9 +455,9 @@ function printOrderInvoice(orderId) {
 
       <div style="margin: 18px 0; padding: 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 12px;">
         <h3 style="margin: 0 0 6px 0; font-size: 12px; font-weight: 800; text-transform: uppercase; color: #475569;">প্রাপকের বিবরণ (Customer Details):</h3>
-        <p style="margin: 3px 0;"><strong>নাম:</strong> ${order.name}</p>
-        <p style="margin: 3px 0;"><strong>মোবাইল:</strong> <span style="font-family: monospace; font-size: 13px;">${order.phone}</span></p>
-        <p style="margin: 3px 0;"><strong>ঠিকানা:</strong> ${order.address}</p>
+        <p style="margin: 3px 0;"><strong>নাম:</strong> ${name}</p>
+        <p style="margin: 3px 0;"><strong>মোবাইল:</strong> <span style="font-family: monospace; font-size: 13px;">${phone}</span></p>
+        <p style="margin: 3px 0;"><strong>ঠিকানা:</strong> ${address}</p>
         <p style="margin: 3px 0;"><strong>এলাকা:</strong> ${order.city === 'inside_dhaka' ? 'ঢাকার ভিতরে' : 'ঢাকার বাইরে'}</p>
       </div>
 
@@ -342,8 +472,8 @@ function printOrderInvoice(orderId) {
         </thead>
         <tbody>
           <tr style="border-bottom: 1px solid #e2e8f0;">
-            <td style="padding: 10px; font-weight: 600;">${order.productTitle}</td>
-            <td style="padding: 10px;">${order.color || '-'} / ${order.size || '-'}</td>
+            <td style="padding: 10px; font-weight: 600;">${productTitle}</td>
+            <td style="padding: 10px;">${color} / ${size}</td>
             <td style="padding: 10px; text-align: center;">${order.quantity || 1}</td>
             <td style="padding: 10px; text-align: right; font-weight: 700;">৳ ${(order.productPrice || order.total - order.deliveryFee).toLocaleString()}</td>
           </tr>
@@ -373,6 +503,9 @@ function openCourierModal(orderId) {
   const order = allOrders.find(o => o.id === orderId);
   if (!order) return;
 
+  const name = escapeHtml(order.name);
+  const phone = escapeHtml(order.phone);
+  const address = escapeHtml(order.address);
   const container = document.getElementById("courier-modal-container");
   container.innerHTML = `
     <div id="courier-dispatch-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
@@ -389,8 +522,8 @@ function openCourierModal(orderId) {
 
         <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs space-y-1">
           <p><strong>অর্ডার আইডি:</strong> #${order.id}</p>
-          <p><strong>প্রাপক:</strong> ${order.name} (${order.phone})</p>
-          <p><strong>ঠিকানা:</strong> ${order.address}</p>
+          <p><strong>প্রাপক:</strong> ${name} (${phone})</p>
+          <p><strong>ঠিকানা:</strong> ${address}</p>
           <p><strong>কালেকশন অ্যামাউন্ট:</strong> <span class="font-bold text-[#FF4D6D]">৳ ${order.total}</span></p>
         </div>
 
@@ -449,7 +582,7 @@ async function executeDispatch(orderId, courierType) {
 
     if (data.success) {
       statusEl.className = "p-3 rounded-xl text-xs font-bold text-center bg-emerald-50 text-emerald-700 block";
-      statusEl.innerHTML = `✅ ${data.message}<br><span class="font-mono mt-1 block">কনসাইনমেন্ট আইডি: ${data.consignment_id}</span>`;
+      statusEl.innerHTML = `✅ ${escapeHtml(data.message)}<br><span class="font-mono mt-1 block">কনসাইনমেন্ট আইডি: ${escapeHtml(data.consignment_id)}</span>`;
       
       // Auto-update order status to Shipped
       await updateOrderStatus(orderId, "Shipped");
@@ -459,7 +592,7 @@ async function executeDispatch(orderId, courierType) {
       }, 2500);
     } else {
       statusEl.className = "p-3 rounded-xl text-xs font-bold text-center bg-rose-50 text-rose-700 block";
-      statusEl.innerHTML = `❌ এরর: ${data.error || 'বুকিং করা যায়নি'}`;
+      statusEl.textContent = `❌ এরর: ${data.error || 'বুকিং করা যায়নি'}`;
     }
   } catch (err) {
     statusEl.className = "p-3 rounded-xl text-xs font-bold text-center bg-rose-50 text-rose-700 block";
